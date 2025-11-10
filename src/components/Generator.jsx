@@ -36,25 +36,67 @@ export default function Generator() {
   const [loading, setLoading] = useState(false);
   const [images, setImages] = useState([]);
 
+  const API_BASE = import.meta.env.VITE_BACKEND_URL || (typeof window !== 'undefined' ? window.location.origin.replace(':3000', ':8000') : '');
+
   const handleGenerate = async () => {
+    if (!prompt.trim()) return;
     setLoading(true);
-    // Simulate loading since backend isn't wired yet
-    await new Promise((r) => setTimeout(r, 1500));
-    setImages([
-      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=800&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1504198266285-165a12d27b73?q=80&w=800&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=800&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1526318472351-c75fcf070305?q=80&w=800&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?q=80&w=800&auto=format&fit=crop',
-      'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=800&auto=format&fit=crop',
-    ]);
-    setLoading(false);
+    try {
+      const res = await fetch(`${API_BASE}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          art_type: artType,
+          style,
+          aspect,
+          resolution,
+          model,
+          count: 6,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to generate');
+      const data = await res.json();
+      setImages(data.images || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRegenerate = () => handleGenerate();
 
+  const downloadImage = async (src) => {
+    try {
+      const a = document.createElement('a');
+      a.href = src;
+      a.download = 'imagify-art.png';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error('Download failed', e);
+    }
+  };
+
+  const shareImage = async (src) => {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Imagify.art', text: 'Check out my AI-generated image', url: src });
+        return;
+      } catch (e) {}
+    }
+    try {
+      await navigator.clipboard.writeText(src);
+      alert('Link copied to clipboard');
+    } catch (e) {
+      console.error('Share failed', e);
+    }
+  };
+
   return (
-    <section className="py-16" style={{ backgroundColor: '#F6F7F9' }}>
+    <section id="generator" className="py-16" style={{ backgroundColor: '#F6F7F9' }}>
       <div className="mx-auto max-w-7xl px-6">
         <div className="grid gap-6 md:grid-cols-12">
           {/* Left: Controls */}
@@ -127,8 +169,8 @@ export default function Generator() {
                     <div key={i} className="group relative overflow-hidden rounded-xl border bg-white shadow-sm transition hover:shadow-md" style={{ borderColor: '#D0D4DC' }}>
                       <img src={src} alt={`gen-${i}`} className="h-44 w-full object-cover transition-transform duration-500 group-hover:scale-105" />
                       <div className="absolute inset-x-0 bottom-0 flex translate-y-10 items-center justify-between gap-2 bg-white/80 p-2 opacity-0 backdrop-blur transition-all group-hover:translate-y-0 group-hover:opacity-100" style={{ borderTop: '1px solid #D0D4DC' }}>
-                        <button className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#4A6078] hover:bg-gray-100"><Download size={16}/> Download</button>
-                        <button className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#4A6078] hover:bg-gray-100"><Share2 size={16}/> Share</button>
+                        <button onClick={() => downloadImage(src)} className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#4A6078] hover:bg-gray-100"><Download size={16}/> Download</button>
+                        <button onClick={() => shareImage(src)} className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#4A6078] hover:bg-gray-100"><Share2 size={16}/> Share</button>
                         <button onClick={handleRegenerate} className="flex items-center gap-1 rounded-md px-2 py-1 text-sm text-[#4A6078] hover:bg-gray-100"><RefreshCw size={16}/> Regenerate</button>
                       </div>
                     </div>
